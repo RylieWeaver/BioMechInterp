@@ -18,9 +18,7 @@ from biomechinterp.utils import resolve_device
 
 def main():
     # Read args
-    parser = argparse.ArgumentParser(
-        description="Run DNABERT2 on DNA sequences and save hidden activations."
-    )
+    parser = argparse.ArgumentParser()
     default_dir = os.path.dirname(os.path.abspath(__file__))
     default_fasta_name = "file.fa"
     parser.add_argument("--fasta_path", type=str, default=f"{default_dir}/{default_fasta_name}", help="Path to fasta file")
