@@ -1,5 +1,4 @@
 # General
-from importlib.resources import path
 import json
 from tqdm import tqdm
 from pathlib import Path
@@ -154,9 +153,9 @@ class SAETrainer:
         while self.cfg.last_epoch < epochs:
             curr_epoch = self.cfg.last_epoch + 1
             self._run_epoch(curr_epoch)
+            self.cfg.last_epoch = curr_epoch
             if self.cfg.checkpoint_dir and self.cfg.save_every and curr_epoch % self.cfg.save_every == 0:
                 self._save_checkpoint(curr_epoch)
-            self.cfg.last_epoch = curr_epoch
 
         # Cleanup
         self.logger.log_time("Train End")
@@ -193,4 +192,6 @@ class SAETrainer:
             logger=Logger(**cfg["logger"]),
         )
         trainer = SAETrainer(trainer_cfg, model)
+        opt_state = torch.load(dir / "optimizer.pt")
+        trainer.optimizer.load_state_dict(opt_state)
         return trainer
