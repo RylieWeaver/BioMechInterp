@@ -177,21 +177,21 @@ class SAETrainer:
         trainer_cfg_path = dir / "trainer_config.json"
         with trainer_cfg_path.open("r") as f:
             cfg = json.load(f)
-        opt_handler = OptHandler(**cfg["opt_handler"])
-        loader_handler = LoaderHandler(**cfg["loader_handler"])
         trainer_cfg = SAETrainerConfig(
-            last_epoch=cfg["last_epoch"],
-            epochs=cfg["epochs"],
-            l1_coefficient=cfg["l1_coefficient"],
-            gradient_clip=cfg["gradient_clip"],
+            last_epoch=cfg.get("last_epoch", -1),
+            epochs=cfg.get("epochs", 20),
+            l1_coefficient=cfg.get("l1_coefficient", 1e-3),
+            gradient_clip=cfg.get("gradient_clip"),
             device=cfg.get("device", "auto"),
-            checkpoint_dir=cfg.get("checkpoint_dir", None),
-            save_every=cfg.get("save_every", None),
-            opt_handler=opt_handler,
-            loader_handler=loader_handler,
-            logger=Logger(**cfg["logger"]),
+            checkpoint_dir=cfg.get("checkpoint_dir"),
+            save_every=cfg.get("save_every"),
+            opt_handler=OptHandler(**cfg.get("opt_handler", {})),
+            loader_handler=LoaderHandler(**cfg.get("loader_handler", {})),
+            logger=Logger(**cfg.get("logger", {})),
         )
         trainer = SAETrainer(trainer_cfg, model)
+
+        # Load optimizer state
         opt_state = torch.load(dir / "optimizer.pt")
         trainer.optimizer.load_state_dict(opt_state)
         return trainer
