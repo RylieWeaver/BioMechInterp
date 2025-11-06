@@ -1,11 +1,9 @@
 # General
 import os, argparse
 from pathlib import Path
-from transformers import AutoTokenizer, AutoModel
 
 # Torch
 import torch
-from torch.utils.data import DataLoader
 
 # biomechinterp
 from biomechinterp.models import SparseAutoencoder, SparseAutoencoderConfig
