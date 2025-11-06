@@ -1,0 +1,61 @@
+# General
+import os, argparse
+from tqdm import tqdm
+from pathlib import Path
+
+# Torch
+import torch
+from torch.utils.data import DataLoader
+
+# biomechinterp
+from biomechinterp.models import SparseAutoencoder
+from biomechinterp.data import move_to
+from biomechinterp.utils import resolve_device
+
+
+
+def main():
+    # Read args
+    parser = argparse.ArgumentParser()
+    default_dir = os.getcwd()
+    parser.add_argument("--pos_data_path", type=str, default=f"{default_dir}/pos_activations.pt", help="Path to positive samples data file.")
+    parser.add_argument("--neg_data_path", type=str, default=f"{default_dir}/neg_activations.pt", help="Path to negative samples data file.")
+    parser.add_argument("--pos_save_path", type=str, default=f"{default_dir}/pos_latents.pt", help="Path to save positive latent representations.")
+    parser.add_argument("--neg_save_path", type=str, default=f"{default_dir}/neg_latents.pt", help="Path to save negative latent representations.")
+    args = parser.parse_args()
+    args.pos_data_path = Path(args.pos_data_path)
+    args.neg_data_path = Path(args.neg_data_path)
+    args.pos_save_path = Path(args.pos_save_path)
+    args.neg_save_path = Path(args.neg_save_path)
+
+    # Get model
+    device = resolve_device("auto")
+    model = SparseAutoencoder.load(f"{default_dir}/checkpoints/epoch_10").to(device)  # Hard-coded for now
+
+    # Get data
+    pos_dataset = move_to(torch.load(args.pos_data_path, weights_only=False), device)
+    neg_dataset = move_to(torch.load(args.neg_data_path, weights_only=False), device)
+    pos_loader = DataLoader(pos_dataset["activations"], batch_size=64, shuffle=False)
+    neg_loader = DataLoader(neg_dataset["activations"], batch_size=64, shuffle=False)
+
+    # Evaluate and collect
+    pos_latents = []
+    neg_latents = []
+    model.eval()
+    with torch.no_grad():
+        for batch in tqdm(pos_loader, desc="Extracting Positive Latents"):
+            _, codes = model(batch)
+            pos_latents.append(codes.cpu())
+        for batch in tqdm(neg_loader, desc="Extracting Negative Latents"):
+            _, codes = model(batch)
+            neg_latents.append(codes.cpu())
+    pos_latents = torch.cat(pos_latents, dim=0)
+    neg_latents = torch.cat(neg_latents, dim=0)
+
+    # Save latents
+    torch.save({"pos_latents": pos_latents}, args.pos_save_path)
+    torch.save({"neg_latents": neg_latents}, args.neg_save_path)
+
+
+if __name__ == "__main__":
+    main()

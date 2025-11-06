@@ -16,12 +16,14 @@ def main():
     # Read args
     parser = argparse.ArgumentParser()
     default_dir = os.getcwd()
-    default_data_fname = "activations.pt"
-    parser.add_argument("--data_path", type=str, default=f"{default_dir}/{default_data_fname}", help="Path to data file.")
+    parser.add_argument("--pos_data_path", type=str, default=f"{default_dir}/pos_activations.pt", help="Path to positive activations file.")
+    parser.add_argument("--neg_data_path", type=str, default=f"{default_dir}/neg_activations.pt", help="Path to negative activations file.")
     parser.add_argument("--model_id", default="InstaDeepAI/nucleotide-transformer-500m-1000g", help="Hugging Face model id.")
     parser.add_argument("--checkpoint_dir", type=str, default=f"{default_dir}/checkpoints", help="Path to checkpoint model.")
     args = parser.parse_args()
-    args.data_path = Path(args.data_path)
+    args.pos_data_path = Path(args.pos_data_path)
+    args.neg_data_path = Path(args.neg_data_path)
+    args.checkpoint_dir = Path(args.checkpoint_dir)
 
     # Get model
     model_cfg = SparseAutoencoderConfig(
@@ -34,7 +36,11 @@ def main():
     model = SparseAutoencoder(model_cfg)
 
     # Get data
-    dataset = torch.load(args.data_path)
+    pos_dataset = torch.load(args.pos_data_path, weights_only=False)
+    neg_dataset = torch.load(args.neg_data_path, weights_only=False)
+    dataset = {
+        "activations": torch.cat([pos_dataset["activations"], neg_dataset["activations"]], dim=0)
+    }  # NOTE: We may need to worry about dataset imbalance here
     train_ds, val_ds, test_ds = shuffle_split(dataset["activations"], seed=42)
 
     # Get handlers for trainer

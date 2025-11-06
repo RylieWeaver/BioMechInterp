@@ -42,13 +42,8 @@ class SAETrainerConfig(Config):
         self.save_every = save_every
         self.device = device
     
-    def save(self, path: Path):
-        cfg = self.to_dict()
-        with path.open("w") as f:
-            json.dump(cfg, f, indent=4)
-
     @staticmethod
-    def load(path: Path):
+    def load(path: Path) -> "SAETrainerConfig":
         """
         The keys here for OptHandler, LoaderHandler, and Logger 
         must match the varnames of their respective instances.
@@ -156,5 +151,6 @@ class SAETrainer:
         save_dir = self.cfg.checkpoint_dir / f"epoch_{epoch}"
         save_dir.mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), save_dir / "model.pt")
+        self.model.cfg.save(save_dir / "model_config.json")
+        self.cfg.save(save_dir / "trainer_config.json")
         torch.save(self.optimizer.state_dict(), save_dir / "optimizer.pt")
-        self.cfg.save(save_dir / "config.json")

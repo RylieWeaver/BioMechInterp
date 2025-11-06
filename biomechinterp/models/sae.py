@@ -1,21 +1,32 @@
 # General
+import json
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Union
 
 # Torch
+import torch
 import torch.nn as nn
 
 # biomechinterp
+from biomechinterp.utils import Config
 from .activation import get_activation
 
 
 
 @dataclass
-class SparseAutoencoderConfig:
+class SparseAutoencoderConfig(Config):
     input_dim: int
     hidden_dim: int
     latent_dim: int
     activation: str = "relu"
     dropout: float = 0.0
+
+    @staticmethod
+    def load(path: Path) -> "SparseAutoencoderConfig":
+        with open(path) as f:
+            data = json.load(f)
+        return SparseAutoencoderConfig(**data)
 
 
 class SparseAutoencoder(nn.Module):
@@ -46,3 +57,17 @@ class SparseAutoencoder(nn.Module):
         codes = self.encoder(inputs)
         reconstruction = self.decoder(codes)
         return reconstruction, codes
+
+    @classmethod
+    def load(cls, dir: Union[Path, str]):
+        # Setup path
+        dir = Path(dir)
+
+        # Init model with config
+        model_cfg = SparseAutoencoderConfig.load(dir / "model_config.json")
+        model = cls(model_cfg)
+
+        # Load state dict
+        state_dict = torch.load(dir / "model.pt", weights_only=True)
+        model.load_state_dict(state_dict)
+        return model

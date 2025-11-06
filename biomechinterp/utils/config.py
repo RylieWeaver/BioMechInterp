@@ -1,5 +1,5 @@
 # General
-import inspect
+import json, inspect
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -25,3 +25,8 @@ class Config:
             elif isinstance(v, Path):
                 out[k] = str(v)
         return out
+    
+    def save(self, path: Path):
+        cfg = self.to_dict()
+        with path.open("w") as f:
+            json.dump(cfg, f, indent=4)
