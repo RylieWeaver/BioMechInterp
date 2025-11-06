@@ -15,7 +15,7 @@ def filtered_kwargs(cls, source: Mapping[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in source.items() if k in params}
 
 
-@dataclass(frozen=True)
+@dataclass
 class Config:
     def to_dict(self):
         out = self.__dict__.copy()

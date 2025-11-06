@@ -25,12 +25,12 @@ STR2OPT = {
 @dataclass
 class OptHandler(Config):
     name: Literal["adam","adamw","sgd","rmsprop","adagrad","adadelta","rprop","lbfgs"] = "adamw"
-    learning_rate: float = 1e-3
+    lr: float = 1e-3
     extras: Optional[Dict[str, Any]] = None
 
     def build(self, params) -> torch.optim.Optimizer:
         opt_cls = STR2OPT[self.name]
-        kwargs: Dict[str, Any] = {"lr": self.learning_rate}
+        kwargs: Dict[str, Any] = {"lr": self.lr}
         if self.extras:
             kwargs.update(filtered_kwargs(opt_cls, self.extras))
         return opt_cls(params, **kwargs)

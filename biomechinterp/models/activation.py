@@ -33,6 +33,6 @@ def get_activation(act_config):
     activation_class = str2act[name]
 
     # Read activation-specific kwargs
-    kwargs = kwargs.update(filtered_kwargs(activation_class, act_config))
+    kwargs = filtered_kwargs(activation_class, act_config)
 
     return partial(activation_class, **kwargs)

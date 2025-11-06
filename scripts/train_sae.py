@@ -1,0 +1,66 @@
+# General
+import os, argparse
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModel
+
+# Torch
+import torch
+from torch.utils.data import DataLoader
+
+# biomechinterp
+from biomechinterp.models import SparseAutoencoder, SparseAutoencoderConfig
+from biomechinterp.data import shuffle_split
+from biomechinterp.training import SAETrainer, SAETrainerConfig, OptHandler, LoaderHandler
+
+
+
+def main():
+    # Read args
+    parser = argparse.ArgumentParser()
+    default_dir = os.getcwd()
+    default_data_fname = "activations.pt"
+    parser.add_argument("--data_path", type=str, default=f"{default_dir}/{default_data_fname}", help="Path to data file.")
+    parser.add_argument("--model_id", default="InstaDeepAI/nucleotide-transformer-500m-1000g", help="Hugging Face model id.")
+    parser.add_argument("--checkpoint_dir", type=str, default=f"{default_dir}/checkpoints", help="Path to checkpoint model.")
+    args = parser.parse_args()
+    args.data_path = Path(args.data_path)
+
+    # Get model
+    model_cfg = SparseAutoencoderConfig(
+        input_dim=1280,  # Currently hard-coded by model
+        hidden_dim=256,
+        latent_dim=128,
+        activation="relu",
+        dropout=0.1,
+    )
+    model = SparseAutoencoder(model_cfg)
+
+    # Get data
+    dataset = torch.load(args.data_path)
+    train_ds, val_ds, test_ds = shuffle_split(dataset["activations"], seed=42)
+
+    # Get handlers for trainer
+    opt_handler = OptHandler(name="adamw", lr=1e-3)
+    loader_handler = LoaderHandler(batch_size=64)
+    trainer_cfg = SAETrainerConfig(
+        epochs=10,
+        l1_coefficient=1e-3,
+        opt_handler=opt_handler,
+        loader_handler=loader_handler,
+        checkpoint_dir=args.checkpoint_dir,
+        save_every=1,
+    )
+    trainer = SAETrainer(
+        config=trainer_cfg,
+        model=model,
+        train_ds=train_ds,
+        val_ds=val_ds,
+        test_ds=test_ds
+    )
+
+    # Train
+    trainer.train()
+
+
+if __name__ == "__main__":
+    main()

@@ -9,12 +9,11 @@ import torch
 
 # biomechinterp
 from biomechinterp.data import move_to
-from biomechinterp.utils import resolve_device
-from loss import sparse_autoencoder_loss
-from optimizer import OptHandler
-from loader import LoaderHandler
-from logger import Logger
-from utils import Config
+from biomechinterp.utils import Config, resolve_device
+from .loss import sparse_autoencoder_loss
+from .optimizer import OptHandler
+from .loader import LoaderHandler
+from .logger import Logger
 
 
 
@@ -85,16 +84,16 @@ class SAETrainer:
         self.train_loader, self.val_loader, self.test_loader = self.loader_handler.build(train_ds, val_ds, test_ds)
         self.optimizer = self.opt_handler.build(self.model.parameters())
 
-    def _run_batch(self, batch):
-        batch = move_to(batch, self.device)
-        preds = self.model(batch["inputs"])
-        labels = batch["labels"]
-        return preds, labels
-    
-    def _compute_loss(self, preds, labels):
+    def _run_batch(self, activations):
+        activations = move_to(activations, self.device)
+        reconstruction, sparse_rep = self.model(activations)
+        return reconstruction, sparse_rep
+
+    def _compute_loss(self, reconstruction, activations, sparse_rep):
         loss = sparse_autoencoder_loss(
-            preds,
-            labels,
+            activations,
+            reconstruction,
+            sparse_rep,
             l1_coefficient=self.cfg.l1_coefficient,
         )
         return loss
@@ -104,8 +103,8 @@ class SAETrainer:
         total_loss = 0.0
         with torch.no_grad():
             for batch in tqdm(loader, desc=desc, leave=False):
-                preds, labels = self._run_batch(batch)
-                loss = self._compute_loss(preds, labels)
+                reconstruction, sparse_rep = self._run_batch(batch)
+                loss = self._compute_loss(reconstruction, batch, sparse_rep)
                 total_loss += loss.item()
         
         epoch_loss = total_loss / len(loader)
@@ -116,8 +115,8 @@ class SAETrainer:
         total_loss = 0.0
         for batch in tqdm(loader, desc=desc, leave=False):
             self.optimizer.zero_grad(set_to_none=True)
-            preds, labels = self._run_batch(batch)
-            loss = self._compute_loss(preds, labels)
+            reconstruction, sparse_rep = self._run_batch(batch)
+            loss = self._compute_loss(reconstruction, batch, sparse_rep)
             loss.backward()
             total_loss += loss.item()
             if self.cfg.gradient_clip is not None:
@@ -154,7 +153,7 @@ class SAETrainer:
         self.logger.log_time("Train End")
 
     def _save_checkpoint(self, epoch: int):
-        save_dir = self.cfg.checkpoint_dir / f"epoch_{epoch}.pt"
+        save_dir = self.cfg.checkpoint_dir / f"epoch_{epoch}"
         save_dir.mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), save_dir / "model.pt")
         torch.save(self.optimizer.state_dict(), save_dir / "optimizer.pt")

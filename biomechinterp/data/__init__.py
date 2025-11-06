@@ -1,4 +1,3 @@
-from .activation_dataset import ActivationDataset, load_manifest
-from .utils import move_to
+from .utils import move_to, shuffle_split
 
-__all__ = ["ActivationDataset", "load_manifest", "move_to"]
+__all__ = ["move_to", "shuffle_split"]

@@ -1,5 +1,4 @@
 # General
-from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -14,7 +13,7 @@ from biomechinterp.utils import Config
 @dataclass
 class LoaderHandler(Config):
     batch_size: int = 64
-    num_workers: int = 1
+    num_workers: int = 0
     pin_memory: bool = False
     drop_last: bool = False
     
