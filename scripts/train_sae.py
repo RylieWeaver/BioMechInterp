@@ -43,7 +43,7 @@ def main():
     }  # NOTE: We may need to worry about dataset imbalance here
     train_ds, val_ds, test_ds = shuffle_split(dataset["activations"], seed=42)
 
-    # Get handlers for trainer
+    # Train from scratch
     opt_handler = OptHandler(name="adamw", lr=1e-3)
     loader_handler = LoaderHandler(batch_size=64)
     trainer_cfg = SAETrainerConfig(
@@ -56,14 +56,16 @@ def main():
     )
     trainer = SAETrainer(
         config=trainer_cfg,
-        model=model,
-        train_ds=train_ds,
-        val_ds=val_ds,
-        test_ds=test_ds
+        model=model
     )
+    trainer.set_loaders(train_ds, val_ds, test_ds)
+    trainer.train(epochs=10)  # Train from 0 to 10
 
-    # Train
-    trainer.train()
+    # Train from checkpoint
+    # ckpt_epoch = 10  # Hard-coded for now
+    # trainer = SAETrainer.load(args.checkpoint_dir / f"epoch_{ckpt_epoch}")
+    # trainer.set_loaders(train_ds, val_ds, test_ds)
+    # trainer.train(last_epoch=ckpt_epoch, epochs=20)  # Continue training from epoch 10 to 20
 
 
 if __name__ == "__main__":

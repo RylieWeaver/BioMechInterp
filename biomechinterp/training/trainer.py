@@ -1,4 +1,5 @@
 # General
+from importlib.resources import path
 import json
 from tqdm import tqdm
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Optional, Union
 import torch
 
 # biomechinterp
+from biomechinterp.models import SparseAutoencoder
 from biomechinterp.data import move_to
 from biomechinterp.utils import Config, resolve_device
 from .loss import sparse_autoencoder_loss
@@ -20,6 +22,7 @@ from .logger import Logger
 class SAETrainerConfig(Config):
     def __init__(
             self,
+            last_epoch: int = -1,
             epochs: int = 20,
             l1_coefficient: float = 1e-3,
             gradient_clip: Optional[float] = None,
@@ -30,6 +33,7 @@ class SAETrainerConfig(Config):
             save_every: Optional[int] = None,
             device: str = "auto"
     ) -> None:
+        self.last_epoch = last_epoch
         self.epochs = epochs
         self.l1_coefficient = l1_coefficient
         self.gradient_clip = gradient_clip
@@ -51,12 +55,13 @@ class SAETrainerConfig(Config):
         with path.open("r") as f:
             cfg = json.load(f)
         return SAETrainerConfig(
+            last_epoch=cfg["last_epoch"],
             epochs=cfg["epochs"],
             l1_coefficient=cfg["l1_coefficient"],
-            gradient_clip=cfg.get("gradient_clip"),
+            gradient_clip=cfg["gradient_clip"],
             device=cfg.get("device", "auto"),
-            checkpoint_dir=cfg.get("checkpoint_dir"),
-            save_every=cfg.get("save_every"),
+            checkpoint_dir=cfg.get("checkpoint_dir", None),
+            save_every=cfg.get("save_every", None),
             opt_handler=OptHandler(**cfg["opt_handler"]),
             loader_handler=LoaderHandler(**cfg["loader_handler"]),
             logger=Logger(**cfg["logger"]),
@@ -64,7 +69,7 @@ class SAETrainerConfig(Config):
 
 
 class SAETrainer:
-    def __init__(self, config, model, train_ds, val_ds, test_ds) -> None:
+    def __init__(self, config, model) -> None:
         # Read args
         self.cfg = config
         self.device = resolve_device(self.cfg.device)
@@ -76,8 +81,10 @@ class SAETrainer:
         self.logger = self.cfg.logger
 
         # Init objects
-        self.train_loader, self.val_loader, self.test_loader = self.loader_handler.build(train_ds, val_ds, test_ds)
         self.optimizer = self.opt_handler.build(self.model.parameters())
+    
+    def set_loaders(self, train_ds, val_ds, test_ds):
+        self.train_loader, self.val_loader, self.test_loader = self.loader_handler.build(train_ds, val_ds, test_ds)
 
     def _run_batch(self, activations):
         activations = move_to(activations, self.device)
@@ -128,21 +135,28 @@ class SAETrainer:
         test_loss = self._loop_without_grad(self.test_loader, desc="Test w/o Grad")
         self.logger.log(f"[Epoch {epoch}]: Train w/ Grad: {train_loss_grad:.6f}, Train w/o Grad: {train_loss_no_grad:.6f}, Val: {val_loss:.6f}, Test: {test_loss:.6f}")
 
-    def train(self) -> None:
+    def train(self, last_epoch=None, epochs=None) -> None:
         # Setup
         self.logger.log_time("Train Start")
+        self.cfg.last_epoch = last_epoch if last_epoch is not None else self.cfg.last_epoch
+        epochs = epochs if epochs is not None else self.cfg.epochs
 
         # Initial evaluation before training
-        train_loss = self._loop_without_grad(self.train_loader, desc="Train w/o Grad")
-        val_loss = self._loop_without_grad(self.val_loader, desc="Val w/o Grad")
-        test_loss = self._loop_without_grad(self.test_loader, desc="Test w/o Grad")
-        self.logger.log(f"[Epoch 0]: Train w/o Grad {train_loss:.6f}, Val: {val_loss:.6f}, Test: {test_loss:.6f}")
+        if self.cfg.last_epoch == -1:
+            curr_epoch = self.cfg.last_epoch + 1
+            train_loss = self._loop_without_grad(self.train_loader, desc="Train w/o Grad")
+            val_loss = self._loop_without_grad(self.val_loader, desc="Val w/o Grad")
+            test_loss = self._loop_without_grad(self.test_loader, desc="Test w/o Grad")
+            self.logger.log(f"[Epoch {curr_epoch}]: Train w/o Grad {train_loss:.6f}, Val: {val_loss:.6f}, Test: {test_loss:.6f}")
+            self.cfg.last_epoch += 1
 
         # Training loop
-        for epoch in range(1, self.cfg.epochs + 1):
-            self._run_epoch(epoch)
-            if self.cfg.checkpoint_dir and self.cfg.save_every and epoch % self.cfg.save_every == 0:
-                self._save_checkpoint(epoch)
+        while self.cfg.last_epoch < epochs:
+            curr_epoch = self.cfg.last_epoch + 1
+            self._run_epoch(curr_epoch)
+            if self.cfg.checkpoint_dir and self.cfg.save_every and curr_epoch % self.cfg.save_every == 0:
+                self._save_checkpoint(curr_epoch)
+            self.cfg.last_epoch = curr_epoch
 
         # Cleanup
         self.logger.log_time("Train End")
@@ -154,3 +168,29 @@ class SAETrainer:
         self.model.cfg.save(save_dir / "model_config.json")
         self.cfg.save(save_dir / "trainer_config.json")
         torch.save(self.optimizer.state_dict(), save_dir / "optimizer.pt")
+
+    @staticmethod
+    def load(dir: Path) -> "SAETrainer":
+        # Load model
+        model = SparseAutoencoder.load(dir)
+
+        # Load trainer
+        trainer_cfg_path = dir / "trainer_config.json"
+        with trainer_cfg_path.open("r") as f:
+            cfg = json.load(f)
+        opt_handler = OptHandler(**cfg["opt_handler"])
+        loader_handler = LoaderHandler(**cfg["loader_handler"])
+        trainer_cfg = SAETrainerConfig(
+            last_epoch=cfg["last_epoch"],
+            epochs=cfg["epochs"],
+            l1_coefficient=cfg["l1_coefficient"],
+            gradient_clip=cfg["gradient_clip"],
+            device=cfg.get("device", "auto"),
+            checkpoint_dir=cfg.get("checkpoint_dir", None),
+            save_every=cfg.get("save_every", None),
+            opt_handler=opt_handler,
+            loader_handler=loader_handler,
+            logger=Logger(**cfg["logger"]),
+        )
+        trainer = SAETrainer(trainer_cfg, model)
+        return trainer
