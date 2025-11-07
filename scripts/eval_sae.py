@@ -9,7 +9,6 @@ from torch.utils.data import DataLoader
 
 # biomechinterp
 from biomechinterp.models import SparseAutoencoder
-from biomechinterp.data import move_to
 from biomechinterp.utils import resolve_device
 
 
@@ -33,8 +32,8 @@ def main():
     model = SparseAutoencoder.load(f"{default_dir}/checkpoints/epoch_10").to(device)  # Hard-coded for now
 
     # Get data
-    pos_dataset = move_to(torch.load(args.pos_data_path, weights_only=False), device)
-    neg_dataset = move_to(torch.load(args.neg_data_path, weights_only=False), device)
+    pos_dataset = torch.load(args.pos_data_path, weights_only=False)
+    neg_dataset = torch.load(args.neg_data_path, weights_only=False)
     pos_loader = DataLoader(pos_dataset["activations"], batch_size=64, shuffle=False)
     neg_loader = DataLoader(neg_dataset["activations"], batch_size=64, shuffle=False)
 
