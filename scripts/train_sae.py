@@ -9,11 +9,12 @@ import torch
 from biomechinterp.models import SparseAutoencoder, SparseAutoencoderConfig
 from biomechinterp.data import shuffle_split
 from biomechinterp.training import SAETrainer, SAETrainerConfig, OptHandler, LoaderHandler
+from biomechinterp.utils import resolve_device
 
 
 
 def main():
-    # Read args
+    # Setup
     parser = argparse.ArgumentParser()
     default_dir = os.getcwd()
     parser.add_argument("--pos_data_path", type=str, default=f"{default_dir}/pos_activations.pt", help="Path to positive activations file.")
@@ -24,6 +25,7 @@ def main():
     args.pos_data_path = Path(args.pos_data_path)
     args.neg_data_path = Path(args.neg_data_path)
     args.checkpoint_dir = Path(args.checkpoint_dir)
+    device = resolve_device("auto")
 
     # Get model
     model_cfg = SparseAutoencoderConfig(
@@ -56,14 +58,15 @@ def main():
     )
     trainer = SAETrainer(
         config=trainer_cfg,
-        model=model
+        model=model,
+        device=device,
     )
     trainer.set_loaders(train_ds, val_ds, test_ds)
     trainer.train(epochs=10)  # Train from 0 to 10
 
     # Train from checkpoint
     # ckpt_epoch = 10  # Hard-coded for now
-    # trainer = SAETrainer.load(args.checkpoint_dir / f"epoch_{ckpt_epoch}")
+    # trainer = SAETrainer.load(args.checkpoint_dir / f"epoch_{ckpt_epoch}", device=device)
     # trainer.set_loaders(train_ds, val_ds, test_ds)
     # trainer.train(last_epoch=ckpt_epoch, epochs=20)  # Continue training from epoch 10 to 20
 

@@ -15,7 +15,7 @@ from biomechinterp.utils import resolve_device
 
 
 def main():
-    # Read args
+    # Setup
     parser = argparse.ArgumentParser()
     default_dir = os.getcwd()
     parser.add_argument("--pos_fasta_path", type=str, default=f"{default_dir}/pos_file.fa", help="Path to positive fasta file")
@@ -32,8 +32,6 @@ def main():
     args.neg_save_path = Path(args.neg_save_path)
     args.pos_save_path.parent.mkdir(parents=True, exist_ok=True)
     args.neg_save_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Setup
     device = resolve_device("auto")
 
     # Get Fasta datasets

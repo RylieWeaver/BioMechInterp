@@ -30,7 +30,6 @@ class SAETrainerConfig(Config):
             logger=None,
             checkpoint_dir: Optional[Union[Path, str]] = None,
             save_every: Optional[int] = None,
-            device: str = "auto"
     ) -> None:
         self.last_epoch = last_epoch
         self.epochs = epochs
@@ -43,7 +42,6 @@ class SAETrainerConfig(Config):
         if self.checkpoint_dir:
             self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self.save_every = save_every
-        self.device = device
     
     @staticmethod
     def load(path: Path) -> "SAETrainerConfig":
@@ -58,7 +56,6 @@ class SAETrainerConfig(Config):
             epochs=cfg["epochs"],
             l1_coefficient=cfg["l1_coefficient"],
             gradient_clip=cfg["gradient_clip"],
-            device=cfg.get("device", "auto"),
             checkpoint_dir=cfg.get("checkpoint_dir", None),
             save_every=cfg.get("save_every", None),
             opt_handler=OptHandler(**cfg["opt_handler"]),
@@ -68,11 +65,11 @@ class SAETrainerConfig(Config):
 
 
 class SAETrainer:
-    def __init__(self, config, model) -> None:
+    def __init__(self, config, model, device: torch.device) -> None:
         # Read args
         self.cfg = config
-        self.device = resolve_device(self.cfg.device)
-        self.model = model.to(self.device)
+        self.model = model.to(device)
+        self.device = device
         self.checkpoint_dir = self.cfg.checkpoint_dir
         self.save_every = self.cfg.save_every
         self.loader_handler = self.cfg.loader_handler
@@ -169,9 +166,9 @@ class SAETrainer:
         torch.save(self.optimizer.state_dict(), save_dir / "optimizer.pt")
 
     @staticmethod
-    def load(dir: Path) -> "SAETrainer":
+    def load(dir: Path, device: torch.device) -> "SAETrainer":
         # Load model
-        model = SparseAutoencoder.load(dir)
+        model = SparseAutoencoder.load(dir).to(device)
 
         # Load trainer
         trainer_cfg_path = dir / "trainer_config.json"
@@ -182,16 +179,15 @@ class SAETrainer:
             epochs=cfg.get("epochs", 20),
             l1_coefficient=cfg.get("l1_coefficient", 1e-3),
             gradient_clip=cfg.get("gradient_clip"),
-            device=cfg.get("device", "auto"),
             checkpoint_dir=cfg.get("checkpoint_dir"),
             save_every=cfg.get("save_every"),
             opt_handler=OptHandler(**cfg.get("opt_handler", {})),
             loader_handler=LoaderHandler(**cfg.get("loader_handler", {})),
             logger=Logger(**cfg.get("logger", {})),
         )
-        trainer = SAETrainer(trainer_cfg, model)
+        trainer = SAETrainer(trainer_cfg, model, device)
 
         # Load optimizer state
         opt_state = torch.load(dir / "optimizer.pt")
-        trainer.optimizer.load_state_dict(opt_state)
+        trainer.optimizer.load_state_dict(opt_state, map_location=device)
         return trainer

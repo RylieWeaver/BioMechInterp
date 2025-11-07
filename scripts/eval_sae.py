@@ -15,7 +15,7 @@ from biomechinterp.utils import resolve_device
 
 
 def main():
-    # Read args
+    # Setup
     parser = argparse.ArgumentParser()
     default_dir = os.getcwd()
     parser.add_argument("--pos_data_path", type=str, default=f"{default_dir}/pos_activations.pt", help="Path to positive samples data file.")
@@ -27,9 +27,9 @@ def main():
     args.neg_data_path = Path(args.neg_data_path)
     args.pos_save_path = Path(args.pos_save_path)
     args.neg_save_path = Path(args.neg_save_path)
+    device = resolve_device("auto")
 
     # Get model
-    device = resolve_device("auto")
     model = SparseAutoencoder.load(f"{default_dir}/checkpoints/epoch_10").to(device)  # Hard-coded for now
 
     # Get data
