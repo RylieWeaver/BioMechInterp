@@ -1,6 +1,6 @@
 # General
 from dataclasses import dataclass
-from typing import Dict, Any, Mapping, Literal, Optional
+from typing import Dict, Any, Literal, Optional
 
 # Torch
 import torch

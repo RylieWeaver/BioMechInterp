@@ -10,7 +10,7 @@ import torch
 # biomechinterp
 from biomechinterp.models import SparseAutoencoder
 from biomechinterp.data import move_to
-from biomechinterp.utils import Config, resolve_device
+from biomechinterp.utils import Config
 from .loss import sparse_autoencoder_loss
 from .optimizer import OptHandler
 from .loader import LoaderHandler
