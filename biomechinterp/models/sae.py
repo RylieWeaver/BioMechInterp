@@ -14,10 +14,16 @@ from .activation import get_activation
 
 
 
-@dataclass
 class SparseAutoencoderConfig(Config):
-    input_dim: int
-    latent_dim: int
+    def __init__(
+        self,
+        input_dim: int,
+        latent_dim: int,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
 
     @staticmethod
     def load(path: Path) -> "SparseAutoencoderConfig":
