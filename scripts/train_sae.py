@@ -44,7 +44,7 @@ def main():
 
     # Train from scratch
     opt_handler = OptHandler(name="adamw", lr=1e-3)
-    loader_handler = LoaderHandler(batch_size=64)
+    loader_handler = LoaderHandler(batch_size=8)
     trainer_cfg = SAETrainerConfig(
         epochs=10,
         l1_coefficient=1e-3,
