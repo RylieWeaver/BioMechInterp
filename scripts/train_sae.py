@@ -31,8 +31,6 @@ def main():
     model_cfg = SparseAutoencoderConfig(
         input_dim=1280,  # Currently hard-coded by model
         latent_dim=128,
-        activation="relu",
-        dropout=0.1,
     )
     model = SparseAutoencoder(model_cfg)
 
