@@ -21,7 +21,7 @@ class SparseAutoencoderConfig(Config):
         latent_dim: int,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        super().__init__()
         self.input_dim = input_dim
         self.latent_dim = latent_dim
 
