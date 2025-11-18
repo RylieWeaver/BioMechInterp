@@ -1,5 +1,5 @@
 # General
-import os, argparse
+import os, argparse, sys
 from pathlib import Path
 from tqdm import tqdm
 import pyfastx
@@ -8,6 +8,9 @@ from transformers import AutoTokenizer, AutoModel
 # Torch
 import torch
 from torch.utils.data import DataLoader
+
+# add the parent directory (project root) to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # biomechinterp
 from biomechinterp.utils import resolve_device

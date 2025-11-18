@@ -1,5 +1,5 @@
 # General
-import os, argparse
+import os, argparse, sys
 from tqdm import tqdm
 from pathlib import Path
 
@@ -7,6 +7,8 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
+# add the parent directory (project root) to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # biomechinterp
 from biomechinterp.models import SparseAutoencoder
 from biomechinterp.utils import resolve_device

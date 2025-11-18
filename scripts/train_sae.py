@@ -1,9 +1,12 @@
 # General
-import os, argparse
+import os, argparse, sys
 from pathlib import Path
 
 # Torch
 import torch
+
+# add the parent directory (project root) to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # biomechinterp
 from biomechinterp.models import SparseAutoencoder, SparseAutoencoderConfig
