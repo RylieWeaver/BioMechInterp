@@ -75,7 +75,7 @@ def main():
             layer_index = args.layer if args.layer >= 0 else len(hidden_states) + args.layer
             layer_hidden = hidden_states[layer_index]                                           # [B, max_S, hidden_size]
             layer_hidden = layer_hidden[mask]                                                   # [T, D] where T is total tokens in batch
-            pos_activations.append(layer_hidden)
+            pos_activations.append(layer_hidden.unsqueeze(0))
 
         # Negative
         neg_activations = []
@@ -99,7 +99,7 @@ def main():
             layer_index = args.layer if args.layer >= 0 else len(hidden_states) + args.layer
             layer_hidden = hidden_states[layer_index]                                           # [B, max_S, hidden_size]
             layer_hidden = layer_hidden[mask]                                                   # [T, D] where T is total tokens in batch
-            neg_activations.append(layer_hidden)
+            neg_activations.append(layer_hidden.unsqueeze(0))
 
     # Collect and save
     pos_activations = torch.cat(pos_activations, dim=0)
