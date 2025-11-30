@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 
 # add the parent directory (project root) to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 # biomechinterp
 from biomechinterp.models import SparseAutoencoder
 from biomechinterp.utils import resolve_device
@@ -31,7 +32,7 @@ def main():
     device = resolve_device("auto")
 
     # Get model
-    model = SparseAutoencoder.load(f"{default_dir}/checkpoints/epoch_10").to(device)  # Hard-coded for now
+    model = SparseAutoencoder.load(f"{default_dir}/checkpoints/epoch_615").to(device)  # Hard-coded for now
 
     # Get data
     pos_dataset = torch.load(args.pos_data_path, weights_only=False)

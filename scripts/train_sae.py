@@ -33,7 +33,7 @@ def main():
     # Get model
     model_cfg = SparseAutoencoderConfig(
         input_dim=1280,  # Currently hard-coded by model
-        latent_dim=128,
+        latent_dim=1280*16,
     )
     model = SparseAutoencoder(model_cfg)
 
@@ -49,7 +49,7 @@ def main():
     opt_handler = OptHandler(name="adamw", lr=1e-3)
     loader_handler = LoaderHandler(batch_size=8)
     trainer_cfg = SAETrainerConfig(
-        epochs=10,
+        epochs=1000,
         l1_coefficient=1e-3,
         opt_handler=opt_handler,
         loader_handler=loader_handler,
@@ -62,7 +62,7 @@ def main():
         device=device,
     )
     trainer.set_loaders(train_ds, val_ds, test_ds)
-    trainer.train(epochs=10)  # Train from 0 to 10
+    trainer.train(epochs=1000)  # Train from 0 to 1000
 
     # Train from checkpoint
     # ckpt_epoch = 10  # Hard-coded for now
