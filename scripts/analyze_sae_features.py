@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import seaborn as sns
+from sklearn.metrics import roc_curve, roc_auc_score
 
 # Torch
 import torch
@@ -60,10 +60,6 @@ def plot_latents(pos_latents, neg_latents, out_path: Path, feature_idx: int, tit
     pos_acts = pos_latents[..., feature_idx].reshape(-1).cpu().numpy()      # [-1]
     neg_acts = neg_latents[..., feature_idx].reshape(-1).cpu().numpy()      # [-1]
 
-    # # Filter 0s
-    # pos_acts = pos_acts[pos_acts > 0]
-    # neg_acts = neg_acts[neg_acts > 0]
-
     # Get CDF data
     x_pos, y_pos = cdf(pos_acts)
     x_neg, y_neg = cdf(neg_acts)
@@ -83,6 +79,115 @@ def plot_latents(pos_latents, neg_latents, out_path: Path, feature_idx: int, tit
         color="blue",
     )
     plt.title(f"{title_prefix} SAE Feature {feature_idx} CDF")
+    plt.xlabel("Activation Magnitude")
+    plt.ylabel("Cumulative Fraction")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
+def plot_roc(pos_latents, neg_latents, out_path: Path, feature_idx: int, title_prefix: str = ""):
+    """
+    pos_latents, neg_latents: [N, L, D] or [N, D] if reduced over L
+    AUROC is computed on the flattened activations for a single feature.
+    """
+    # Flatten feature activations
+    pos_acts = pos_latents[..., feature_idx].reshape(-1).cpu().numpy()
+    neg_acts = neg_latents[..., feature_idx].reshape(-1).cpu().numpy()
+    scores = np.concatenate([pos_acts, neg_acts])
+
+    # Get Score Where Feature Indicates TATA: 1=TATA, 0=Control
+    y_up = np.concatenate([
+        np.ones_like(pos_acts, dtype=np.int32),
+        np.zeros_like(neg_acts, dtype=np.int32),
+    ])
+    auc_up = roc_auc_score(y_up, scores)
+
+    # Get Score Where Feature Indicates Control: 1=Control, 0=TATA
+    y_down = np.concatenate([
+        np.zeros_like(pos_acts, dtype=np.int32),
+        np.ones_like(neg_acts, dtype=np.int32),
+    ])
+    auc_down = roc_auc_score(y_down, scores)
+
+    # Dynamically choose best direction
+    ## Positive numbers indicate TATA
+    if auc_up >= 0.5:
+        auc = auc_up
+        preferred = "TATA"
+        fpr, tpr, _ = roc_curve(y_up, scores, pos_label=1)
+    ## Positive numbers indicate Control
+    else:
+        auc = auc_down
+        preferred = "Control"
+        fpr, tpr, _ = roc_curve(y_down, scores, pos_label=1)
+
+    plt.figure(figsize=(6, 6))
+    plt.plot(fpr, tpr, label=f"AUROC = {auc:.3f} ({preferred})")
+    plt.plot([0, 1], [0, 1], linestyle="--")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title(f"{title_prefix} SAE Feature {feature_idx} ROC")
+    plt.legend(loc="lower right")
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
+def _bootstrap_ecdf(vals, n_boot, grid_size, random_seed):
+    vals = np.asarray(vals)
+    N = len(vals)
+    rng = np.random.default_rng(random_seed)
+
+    x_grid = np.linspace(vals.min(), vals.max(), grid_size)         # [G]
+    boot_cdfs = np.empty((n_boot, grid_size), dtype=np.float64)     # [B, G]
+
+    for b in range(n_boot):
+        sample = vals[rng.integers(0, N, size=N)]                   # [N]
+        comparisons = (sample[:, None] <= x_grid[None, :])          # [N, G]
+        cdfs = comparisons.mean(axis=0)                             # [G]
+        boot_cdfs[b] = cdfs
+
+    ecdf = (vals[:, None] <= x_grid[None, :]).mean(axis=0)          # [G]: observed CDF
+    lo, hi = np.percentile(boot_cdfs, [0.5, 99.5], axis=0)          # 99% CI
+    return x_grid, ecdf, lo, hi
+
+
+def plot_latents_bootstrap(
+        pos_latents,
+        neg_latents,
+        out_path: Path,
+        feature_idx: int,
+        title_prefix: str = "",
+        n_boot: int = 10000,
+        grid_size: int = 200,
+        random_seed: int = 42
+    ):
+    """
+    Bootstrapped ECDFs with 99% CIs for each feature.
+    pos_latents, neg_latents: [N, L, D] or [N, D]
+    """
+    # Flatten feature activations
+    pos_acts = pos_latents[..., feature_idx].reshape(-1).cpu().numpy()
+    neg_acts = neg_latents[..., feature_idx].reshape(-1).cpu().numpy()
+
+    x_pos, ecdf_pos, lo_pos, hi_pos = _bootstrap_ecdf(
+        pos_acts, n_boot=n_boot, grid_size=grid_size, random_seed=random_seed
+    )
+    x_neg, ecdf_neg, lo_neg, hi_neg = _bootstrap_ecdf(
+        neg_acts, n_boot=n_boot, grid_size=grid_size, random_seed=random_seed
+    )
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(x_pos, ecdf_pos, label=f"TATA (n={len(pos_acts)})")
+    plt.fill_between(x_pos, lo_pos, hi_pos, alpha=0.2)
+
+    plt.plot(x_neg, ecdf_neg, label=f"Control (n={len(neg_acts)})")
+    plt.fill_between(x_neg, lo_neg, hi_neg, alpha=0.2)
+
+    plt.title(f"{title_prefix} SAE Feature {feature_idx} CDF (bootstrapped 99% CI)")
     plt.xlabel("Activation Magnitude")
     plt.ylabel("Cumulative Fraction")
     plt.legend()
@@ -147,11 +252,11 @@ def main():
     }
     summary_df = pd.DataFrame(summary_data)
     print(summary_df)
-    summary_df.to_csv(args.output_dir / "sae_feature_analysis_summary.csv", index=False)
+    summary_df.to_csv(args.output_dir / "summary.csv", index=False)
 
     # Plot distributions and save
-    for idx in set(topk_mean_indices + topk_max_indices + topk_mean_bin_indices + topk_max_bin_indices):
-        out_path = args.output_dir / f"sae_feature_{idx}_distribution.png"
+    for idx in sorted(set(topk_mean_indices + topk_max_indices + topk_mean_bin_indices + topk_max_bin_indices)):
+        out_path = args.output_dir / f"{idx}_cdf.png"
         plot_latents(
             pos_latents["mag"],
             neg_latents["mag"],
@@ -159,17 +264,59 @@ def main():
             feature_idx=idx,
             title_prefix="All",
         )
+        plot_latents_bootstrap(
+            pos_latents["mag"],
+            neg_latents["mag"],
+            args.output_dir / f"{idx}_cdf_bootstrap.png",
+            feature_idx=idx,
+            title_prefix="All",
+        )
+        plot_roc(
+            pos_latents["mag"],
+            neg_latents["mag"],
+            args.output_dir / f"{idx}_roc.png",
+            feature_idx=idx,
+            title_prefix="All",
+        )
         plot_latents(
             pos_latents["mag_means"],
             neg_latents["mag_means"],
-            args.output_dir / f"sae_feature_{idx}_mean_distribution.png",
+            args.output_dir / f"{idx}_mean_cdf.png",
+            feature_idx=idx,
+            title_prefix="Mean Reduced",
+        )
+        plot_latents_bootstrap(
+            pos_latents["mag_means"],
+            neg_latents["mag_means"],
+            args.output_dir / f"{idx}_mean_cdf_bootstrap.png",
+            feature_idx=idx,
+            title_prefix="Mean Reduced",
+        )
+        plot_roc(
+            pos_latents["mag_means"],
+            neg_latents["mag_means"],
+            args.output_dir / f"{idx}_mean_roc.png",
             feature_idx=idx,
             title_prefix="Mean Reduced",
         )
         plot_latents(
             pos_latents["mag_maxs"],
             neg_latents["mag_maxs"],
-            args.output_dir / f"sae_feature_{idx}_max_distribution.png",
+            args.output_dir / f"{idx}_max_cdf.png",
+            feature_idx=idx,
+            title_prefix="Max Reduced",
+        )
+        plot_latents_bootstrap(
+            pos_latents["mag_maxs"],
+            neg_latents["mag_maxs"],
+            args.output_dir / f"{idx}_max_cdf_bootstrap.png",
+            feature_idx=idx,
+            title_prefix="Max Reduced",
+        )
+        plot_roc(
+            pos_latents["mag_maxs"],
+            neg_latents["mag_maxs"],
+            args.output_dir / f"{idx}_max_roc.png",
             feature_idx=idx,
             title_prefix="Max Reduced",
         )
